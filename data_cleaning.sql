@@ -1,4 +1,4 @@
--- Creación de la base de datos y la tabla
+-- Creation of the database and table.
 CREATE SCHEMA IF NOT EXISTS cyclistic;
 
 USE cyclistic;
@@ -19,39 +19,39 @@ CREATE TABLE cyclistic_2023 (
     member_casual VARCHAR(50)
 );
 
--- Se importan los datos de los 12 archivos CSV a la base de datos
+-- Data from the 12 CSV files is imported into the database.
 SHOW VARIABLES LIKE "local_infile";
 
-SET GLOBAL local_infile=1; -- Para habilitar la carga de datos desde un archivo local
+SET GLOBAL local_infile=1; -- Enablement of data loading from a local file.
 
 LOAD DATA INFILE "C:\\ProgramData\\MySQL\\MySQL Server 8.0\\Uploads\\202301-divvy-tripdata.csv"
 INTO TABLE cyclistic_2023 
 FIELDS TERMINATED BY "," 
 IGNORE 1 ROWS
 
--- Verificación de la estructura de la tabla
+-- Verification of the table structure.
 DESCRIBE cyclistic_2023; 
 
--- Comprobación de que el número de registros de la tabla combinada coincide con la suma de las tablas individuales: 5.718.902 registros
+-- Check that the number of records in the combined table matches the sum of the individual tables: 5,718,902 records.
 SELECT COUNT(*)
 FROM cyclistic_2023;
 
--- Comprobación del número de columnas
-SELECT COUNT(*) AS num_columnas
+-- Verification of the number of columns.
+SELECT COUNT(*) AS num_columns
 FROM INFORMATION_SCHEMA.COLUMNS
 WHERE TABLE_SCHEMA = 'cyclistic' AND TABLE_NAME = 'cyclistic_2023';
 
--- Creación de un índice para acelerar la velocidad de carga de las consultas
+-- Creation of an index to speed up query execution.
 CREATE INDEX index_ride_id ON cyclistic_2023 (ride_id);
 
--- Identificación de valores duplicados en la columna ride_id
-SELECT ride_id, COUNT(*) AS duplicados
+-- Identification of duplicate values in the ride_id column.
+SELECT ride_id, COUNT(*) AS duplicates
 FROM cyclistic_2023
 GROUP BY ride_id
 HAVING COUNT(*) > 1
-ORDER BY duplicados DESC, ride_id;
+ORDER BY duplicates DESC, ride_id;
 
--- Eliminación de 46 filas con valores duplicados en la columna ride_id
+-- Removal of 46 rows with duplicate values in the ride_id column.
 DELETE FROM cyclistic_2023
 WHERE ride_id IN (
     SELECT ride_id
@@ -60,106 +60,104 @@ WHERE ride_id IN (
         FROM cyclistic_2023
         GROUP BY ride_id
         HAVING COUNT(*) > 1
-    ) AS duplicados
+    ) AS duplicates
 );
 
--- Identificación de registros en blanco y nulos en la columna ride_id. No existe ninguno
+-- Identification of blank or null records in the ride_id column. None found.
 SELECT *
 FROM cyclistic_2023
 WHERE ride_id = '' OR ride_id IS NULL;
 
--- Comprobación de los tipos de bicicleta en la columna rideable_type
+-- Verification of bike types in the rideable_type column.
 SELECT DISTINCT rideable_type
 FROM cyclistic_2023;
 
--- La consulta anterior devuelve tres tipos de bicicleta: electric_bike, classic_bike, docked_bike. docked_bike es un tipo de classic_bike, por lo que se cambia para que solo existan dos tipos de bicicleta, afectando a 78.270 registros.
+-- The query returns three bike types: electric_bike, classic_bike, and docked_bike. Since docked_bike is a subtype of classic_bike, it has been consolidated, leaving only two bike types, which affects 78,270 records.
 UPDATE cyclistic_2023
 SET rideable_type = 'classic_bike'
 WHERE rideable_type = 'docked_bike';
 
--- Identificación de registros en blanco y nulos en la columna rideable_type. No existe ninguno
+-- Identification of blank or null values in the rideable_type column. None found.
 SELECT *
 FROM cyclistic_2023
 WHERE rideable_type = '' OR rideable_type IS NULL;
 
--- Identificación de filas en las que la hora de started_at es más tarde que la de ended_at, lo cual es un error
+-- Identification of rows where started_at is later than ended_at, which is erroneous.
 SELECT *
 FROM cyclistic_2023
 WHERE started_at > ended_at;
 
--- Eliminación de 272 filas en las que started_at es mayor que ended_at
+-- Removal of 272 rows where started_at is greater than ended_at.
 DELETE FROM cyclistic_2023
 WHERE started_at > ended_at;
 
--- Identificación de valores atípicos en las columnas started_at y ended_at. Se han considerado como atípicos los viajes que tienen como duración menos de un minuto o más de un día.
+-- Identification of outliers in the started_at and ended_at columns. Outliers are defined as trips shorter than one minute or longer than one day.
 SELECT *
 FROM cyclistic_2023
 WHERE TIMESTAMPDIFF(SECOND, started_at, ended_at) < 60 
-OR TIMESTAMPDIFF(SECOND, started_at, ended_at) > 86400; -- 86400 segundos equivalen a 24 horas
+OR TIMESTAMPDIFF(SECOND, started_at, ended_at) > 86400; -- 86400 seconds equals 24 hours.
 
--- Eliminación de 155.727 filas con valores atípicos
+-- Removal of 155,727 rows with outliers.
 DELETE FROM cyclistic_2023
 WHERE TIMESTAMPDIFF(SECOND, started_at, ended_at) < 60 
 OR TIMESTAMPDIFF(SECOND, started_At, ended_at) > 86400;
 
--- A partir de las columnas started_at y ended_at, se crea la columna ride_length
+-- Creation of the ride_length column from the started_at and ended_at columns.
 ALTER TABLE cyclistic_2023
 ADD ride_length TIME;
 
--- Se calcula la duración de cada viaje en formato HH:MM:SS
+-- Calculation of the ride duration in HH:MM format.
 UPDATE cyclistic_2023
 SET ride_length = TIMEDIFF(ended_at, started_at);
 
--- Verificación de la columna ride_length
+-- Verification of the ride_length column.
 SELECT started_at, ended_at, ride_length
 FROM cyclistic_2023
 LIMIT 20
 
--- Identificación de registros en blanco y nulos en la columna ride_length. No existe ninguno
+-- Identification of blank or null records in the ride_length column. None found.
 SELECT *
 FROM cyclistic_2023
 WHERE ride_length = '' OR ride_length IS NULL;
 
--- A partir de la columna started_at, se crea la columna day_of_week
+-- Creation of the day_of_week column from the started_at column.
 ALTER TABLE cyclistic_2023
 ADD day_of_week VARCHAR(20);
 
--- Se identifica el día de la semana en que inició cada viaje
+-- Identification of the day of the week for each ride.
 UPDATE cyclistic_2023
 SET day_of_week = DAYNAME(started_at);
 
--- Verificación del resultado de la consulta anterior
+-- Verification of the results of the previous query.
 SELECT started_at, day_of_week
 FROM cyclistic_2023
 LIMIT 10;
 
--- Comprobación de que en la columna member_casual solo hay dos opciones
+-- Confirmation that there are only two options in the member_casual column.
 SELECT DISTINCT member_casual
 FROM cyclistic_2023;
 
--- Eliminación de caracteres especiales en la columna "member_casual"
+-- Removal of special characters in the member_casual column.
 UPDATE cyclistic_2023
 SET member_casual = REPLACE(member_casual, '\r', '');
 
--- Identificación de registros con dos o más espacios extras entre palabras en las columnas start_station_name y end_station_name
+-- Identification of records with two or more extra spaces between words in the start_station_name and end_station_name columns.
 SELECT *
 FROM cyclistic_2023
 WHERE start_station_name REGEXP '[[:space:]]{2,}' OR end_station_name REGEXP '[[:space:]]{2,}';
 
--- Eliminación de los espacios extra entre palabras en 8 registros de las columnas start_station_name y end_station_name
+-- Removal of extra spaces in 8 records from the start_station_name and end_station_name columns.
 UPDATE cyclistic_2023
 SET start_station_name = REPLACE(start_station_name, '  ', ' '),
     end_station_name = REPLACE(end_station_name, '  ', ' ')
 WHERE start_station_name LIKE '%  %' OR end_station_name LIKE '%  %';
 
--- Comprobación de valores nulos o en blanco en la columna start_station_name en el caso de bicicletas clásicas. Este tipo de bicicleta debe comenzar en una estación designada, a diferencia de las bicicletas eléctricas, para las cuales no es obligatorio
-SELECT *
+-- Verification of blank or null values in the start_station_name column for classic bikes. Classic bikes must start at a designated station, unlike electric bikes, where this is not required.
 FROM cyclistic_2023
 WHERE (start_station_name IS NULL OR start_station_name = '') 
 AND rideable_type = 'classic_bike';
 
-
--- Eliminación de 876 filas con valores nulos o en blanco en la columna start_station_name en el caso de bicicletas clásicas
+-- Removal of 876 rows with blank or null values in the start_station_name column for classic bikes.
 DELETE FROM cyclistic_2023
 WHERE (start_station_name IS NULL OR start_station_name = '') 
 AND rideable_type = 'classic_bike';
